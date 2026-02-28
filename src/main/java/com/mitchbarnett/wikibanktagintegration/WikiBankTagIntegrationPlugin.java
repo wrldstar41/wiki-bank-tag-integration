@@ -88,14 +88,40 @@ public class WikiBankTagIntegrationPlugin extends Plugin {
     private Gson gson;
 
     @Subscribe
-    public void onCommandExecuted(CommandExecuted commandExecuted) {
-        String[] args = commandExecuted.getArguments();
-        if (commandExecuted.getCommand().equals(config.categoryChatCommand()) && args.length > 0) {
-            addTagsFromCategory(String.join(" ", args));
-        } else if (commandExecuted.getCommand().equals(config.dropsChatCommand()) && args.length > 0) {
-            addTagsFromDrops(String.join(" ", args));
-        }
+   @Subscribe
+public void onChatMessage(ChatMessage event) {
+    if (event.getType() != ChatMessageType.FRIENDSCHATNOTIFICATION) {
+        return;
     }
+
+    String msg = event.getMessage();
+    if (!msg.startsWith("::" + config.btCatCommand())) {
+        return;
+    }
+
+    // Extrai o argumento após o comando
+    String args = msg.substring(("::" + config.btCatCommand()).length()).trim();
+    if (args.isEmpty()) return;
+
+    // FIX: Usa as categorias limpas para montar o nome da aba
+    boolean useVariants = args.contains("*");
+    String[] rawCategories = args.split("\\|\\|");
+
+    // FIX: Nome da aba = categorias sem * e com _ entre elas
+    String tabName = Arrays.stream(rawCategories)
+        .map(c -> c.replace("*", "").trim())
+        .collect(Collectors.joining("_"));
+
+    // Cria a aba com o nome limpo
+    tagManager.addTab(tabName);
+
+    // FIX: Itera todas as categorias, não só a primeira
+    for (String rawCat : rawCategories) {
+        String cleanCat = rawCat.replace("*", "").trim();
+        fetchAndTagCategory(cleanCat, tabName, useVariants);
+    }
+}
+
 
     @Provides
     WikiBankTagIntegrationConfig provideConfig(ConfigManager configManager) {
